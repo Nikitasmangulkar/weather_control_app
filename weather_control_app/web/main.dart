@@ -1,4 +1,13 @@
 import 'package:web/web.dart' as web;
+import '../firebase_backend.dart';
+
+
+const firebaseApiKey  = 'AIzaSyDIp4BwqfynBXIPhrZUKV38dxjOg475J6s';
+const firebaseProject = 'weather-control-webapp';
+
+late final FirebaseBackend backend;
+
+
 
 void main() {
   print('Weather Control App starting...');
@@ -102,4 +111,43 @@ void saveToFirebase(String temp, String humidity, String wind, String weatherTyp
 
 void updateDisplay() {
   print('Weather Control Center initialized successfully!');
+}
+
+
+
+
+
+
+Future<void> main() async {
+  backend = FirebaseBackend(apiKey: firebaseApiKey, projectId: firebaseProject);
+
+
+  await backend.signInAnonymously();
+
+
+  final weather = await backend.getWeather();
+  _renderWeather(weather);
+
+  
+  querySelector('#applyButton')!.onClick.listen((_) async {
+    final temp = (querySelector('#tempRange') as InputElement).valueAsNumber!.toInt();
+    final hum  = (querySelector('#humidityRange') as InputElement).valueAsNumber!.toInt();
+    final wind = (querySelector('#windRange') as InputElement).valueAsNumber!.toInt();
+    final type = (querySelector('#weatherType') as SelectElement).value ?? 'Sunny';
+
+    await backend.updateWeather({
+      'temperature': temp,
+      'humidity': hum,
+      'windSpeed': wind,
+      'type': type,
+      'updatedBy': backend.uid,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  });
+
+void _renderWeather(Map<String, dynamic> w) {
+  querySelector('#tempOut')!.text = '${w['temperature'] ?? 20}°C';
+  querySelector('#humOut')!.text  = '${w['humidity'] ?? 50}%';
+  querySelector('#windOut')!.text = '${w['windSpeed'] ?? 10} km/h';
+  querySelector('#typeOut')!.text = (w['type'] ?? 'Sunny').toString();
 }
