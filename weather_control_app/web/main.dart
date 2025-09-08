@@ -1,71 +1,83 @@
 import 'package:web/web.dart' as web;
+import 'firebase_backend.dart';
 
-void main() {
+const firebaseApiKey  = 'AIzaSyDIp4BwqfynBXIPhrZUKV38dxjOg475J6s';
+const firebaseProject = 'weather-control-webapp';
+
+late final FirebaseBackend backend;
+
+Future<void> main() async {
   print('Weather Control App starting...');
-  
-  // Initialize UI controls
+
+  // Init Firebase backend
+  backend = FirebaseBackend(apiKey: firebaseApiKey, projectId: firebaseProject);
+  await backend.signInAnonymously();
+
+  // Load initial weather from backend and render
+  final weather = await backend.getWeather();
+  _renderWeather(weather);
+
+  // Initialize UI controls & listeners
   setupControls();
-  updateDisplay();
+
+  print('Weather Control Center initialized successfully!');
 }
 
 void setupControls() {
   // Temperature control
   final tempSlider = web.document.querySelector('#temperature') as web.HTMLInputElement;
-  final tempValue = web.document.querySelector('#temp-value') as web.HTMLSpanElement;
-  
-  tempSlider.onInput.listen((event) {
-    tempValue.text = '${tempSlider.value}°C';
-  });
+  final tempValue  = web.document.querySelector('#temp-value') as web.HTMLSpanElement;
+  tempSlider.onInput.listen((_) => tempValue.text = '${tempSlider.value}°C');
 
   // Humidity control
   final humiditySlider = web.document.querySelector('#humidity') as web.HTMLInputElement;
-  final humidityValue = web.document.querySelector('#humidity-value') as web.HTMLSpanElement;
-  
-  humiditySlider.onInput.listen((event) {
-    humidityValue.text = '${humiditySlider.value}%';
-  });
+  final humidityValue  = web.document.querySelector('#humidity-value') as web.HTMLSpanElement;
+  humiditySlider.onInput.listen((_) => humidityValue.text = '${humiditySlider.value}%');
 
   // Wind control
   final windSlider = web.document.querySelector('#wind') as web.HTMLInputElement;
-  final windValue = web.document.querySelector('#wind-value') as web.HTMLSpanElement;
-  
-  windSlider.onInput.listen((event) {
-    windValue.text = '${windSlider.value} km/h';
-  });
+  final windValue  = web.document.querySelector('#wind-value') as web.HTMLSpanElement;
+  windSlider.onInput.listen((_) => windValue.text = '${windSlider.value} km/h');
 
   // Apply changes button
   final applyButton = web.document.querySelector('#apply-changes') as web.HTMLButtonElement;
-  applyButton.onClick.listen((event) {
-    applyWeatherChanges();
+  applyButton.onClick.listen((_) async {
+    await applyWeatherChanges();
   });
 }
 
-void applyWeatherChanges() {
-  final temp = (web.document.querySelector('#temperature') as web.HTMLInputElement).value;
-  final humidity = (web.document.querySelector('#humidity') as web.HTMLInputElement).value;
-  final wind = (web.document.querySelector('#wind') as web.HTMLInputElement).value;
+Future<void> applyWeatherChanges() async {
+  final temp        = (web.document.querySelector('#temperature') as web.HTMLInputElement).value;
+  final humidity    = (web.document.querySelector('#humidity') as web.HTMLInputElement).value;
+  final wind        = (web.document.querySelector('#wind') as web.HTMLInputElement).value;
   final weatherType = (web.document.querySelector('#weather-type') as web.HTMLSelectElement).value;
 
   // Update current status display
-  (web.document.querySelector('#current-temp') as web.HTMLSpanElement).text = '$temp°C';
+  (web.document.querySelector('#current-temp') as web.HTMLSpanElement).text     = '$temp°C';
   (web.document.querySelector('#current-humidity') as web.HTMLSpanElement).text = '$humidity%';
-  (web.document.querySelector('#current-wind') as web.HTMLSpanElement).text = '$wind km/h';
-  (web.document.querySelector('#current-weather') as web.HTMLSpanElement).text = 
+  (web.document.querySelector('#current-wind') as web.HTMLSpanElement).text     = '$wind km/h';
+  (web.document.querySelector('#current-weather') as web.HTMLSpanElement).text  =
       weatherType[0].toUpperCase() + weatherType.substring(1);
 
   // Update background based on weather type
   updateBackground(weatherType);
-  
-  // Here you would typically save to Firebase
-  saveToFirebase(temp, humidity, wind, weatherType);
-  
+
+  // Persist to Firebase
+  await backend.updateWeather({
+    'temperature': int.tryParse(temp ?? '') ?? 20,
+    'humidity': int.tryParse(humidity ?? '') ?? 50,
+    'windSpeed': int.tryParse(wind ?? '') ?? 10,
+    'type': weatherType,
+    'updatedBy': backend.uid,
+    'updatedAt': DateTime.now().toIso8601String(),
+  });
+
   print('Weather updated: $temp°C, $humidity%, $wind km/h, $weatherType');
 }
 
 void updateBackground(String weatherType) {
   final body = web.document.body!;
-  
-  switch(weatherType) {
+  switch (weatherType) {
     case 'sunny':
       body.style.background = 'linear-gradient(135deg, #f7b733, #fc4a1a)';
       break;
@@ -86,20 +98,9 @@ void updateBackground(String weatherType) {
   }
 }
 
-void saveToFirebase(String temp, String humidity, String wind, String weatherType) {
-  // Firebase integration placeholder - will be implemented when Firebase is properly set up
-  final data = {
-    'temperature': temp,
-    'humidity': humidity,
-    'windSpeed': wind,
-    'weatherType': weatherType,
-    'timestamp': DateTime.now().toIso8601String(),
-  };
-  
-  print('Weather data prepared for Firebase: $data');
-  // TODO: Implement Firebase SDK integration for web
-}
-
-void updateDisplay() {
-  print('Weather Control Center initialized successfully!');
+void _renderWeather(Map<String, dynamic> w) {
+  (web.document.querySelector('#current-temp') as web.HTMLSpanElement).text     = '${w['temperature'] ?? 20}°C';
+  (web.document.querySelector('#current-humidity') as web.HTMLSpanElement).text = '${w['humidity'] ?? 50}%';
+  (web.document.querySelector('#current-wind') as web.HTMLSpanElement).text     = '${w['windSpeed'] ?? 10} km/h';
+  (web.document.querySelector('#current-weather') as web.HTMLSpanElement).text  = (w['type'] ?? 'Sunny').toString();
 }
